@@ -2,11 +2,11 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>App Entregas - Modo Teste Realista</title>
+<title>App Entregas Ultra Realista</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- LEAFLET CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
 
 <style>
 :root {
@@ -17,140 +17,31 @@
   --vermelho: #d32f2f;
 }
 
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: var(--cinza);
-}
-
-header {
-  background: var(--azul);
-  color: white;
-  padding: 16px;
-  text-align: center;
-  font-size: 20px;
-  font-weight: bold;
-  position: sticky;
-  top: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-#saldo {
-  font-weight: normal;
-  font-size: 16px;
-}
-
-#map {
-  width: 100%;
-  height: 300px;
-  margin: 10px 0;
-  border-radius: 10px;
-}
-
-ul {
-  list-style: none;
-  padding: 10px;
-}
-
-li {
-  background: white;
-  padding: 14px;
-  margin-bottom: 12px;
-  border-radius: 10px;
-  box-shadow: 0 2px 6px rgba(0,0,0,.1);
-  display: flex;
-  flex-direction: column;
-}
-
-.status {
-  font-weight: bold;
-  margin-bottom: 6px;
-}
-
+body { margin:0; font-family:Arial, sans-serif; background: var(--cinza); }
+header { background: var(--azul); color:white; padding:16px; display:flex; justify-content:space-between; align-items:center; font-weight:bold; position:sticky; top:0; }
+#saldo { font-weight: normal; font-size:16px; }
+#map { width:100%; height:300px; margin:10px 0; border-radius:10px; }
+ul { list-style:none; padding:10px; }
+li { background:white; padding:14px; margin-bottom:12px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,.1); display:flex; flex-direction:column; }
+.status { font-weight:bold; margin-bottom:6px; }
 .status.disponivel { color: var(--verde); }
 .status.aceita { color: var(--laranja); }
 .status.concluida { color: gray; }
 .status.cancelada { color: var(--vermelho); }
+.tempo, .valor, .distancia, .estimativa, .codigo { font-size:14px; color:#555; }
+button.acao { margin-top:8px; background:var(--laranja); color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; }
+#btnDisponivel { width:90%; margin:10px auto; display:block; padding:14px; background: var(--verde); color:white; border:none; border-radius:8px; font-size:16px; cursor:pointer; }
 
-.tempo, .valor, .distancia, .estimativa, .codigo {
-  font-size: 14px;
-  color: #555;
-}
+#chat-container { position: fixed; bottom: 0; right:0; width:300px; height:400px; background:white; border:1px solid #ccc; border-radius:10px; display:flex; flex-direction:column; box-shadow:0 2px 10px rgba(0,0,0,0.2); z-index:999; }
+#chat-header { background: var(--azul); color:white; padding:10px; font-weight:bold; border-top-left-radius:10px; border-top-right-radius:10px; }
+#chat-messages { flex:1; padding:10px; overflow-y:auto; }
+#chat-input { flex:1; padding:8px; border:none; }
+#chat-send { background: var(--azul); color:white; border:none; padding:8px; cursor:pointer; }
 
-button.acao {
-  margin-top: 8px;
-  background: var(--laranja);
-  color: white;
-  border: none;
-  padding: 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: bold;
-}
-
-#btnDisponivel {
-  width: 90%;
-  margin: 10px auto;
-  display: block;
-  padding: 14px;
-  background: var(--verde);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-/* CHAT */
-#chat-container {
-  position: fixed;
-  bottom: 0;
-  right: 0;
-  width: 300px;
-  height: 400px;
-  background:white;
-  border:1px solid #ccc;
-  border-radius:10px;
-  display:flex;
-  flex-direction:column;
-  box-shadow:0 2px 10px rgba(0,0,0,0.2);
-  z-index: 999;
-}
-
-#chat-header {
-  background: var(--azul);
-  color:white;
-  padding:10px;
-  font-weight:bold;
-  border-top-left-radius:10px;
-  border-top-right-radius:10px;
-}
-
-#chat-messages {
-  flex:1;
-  padding:10px;
-  overflow-y:auto;
-}
-
-#chat-input {
-  flex:1;
-  padding:8px;
-  border:none;
-  border-radius:0;
-}
-
-#chat-send {
-  background: var(--azul);
-  color:white;
-  border:none;
-  padding:8px;
-  cursor:pointer;
-}
+input.codigo-coleta { margin-top:6px; padding:6px; border-radius:4px; border:1px solid #ccc; }
+button.confirmar { background:var(--verde); color:white; border:none; padding:8px; border-radius:4px; margin-top:6px; cursor:pointer; font-weight:bold; }
 </style>
 </head>
-
 <body>
 
 <header>
@@ -159,9 +50,7 @@ button.acao {
 </header>
 
 <button id="btnDisponivel">Ficar Indisponível</button>
-
 <div id="map"></div>
-
 <ul id="lista"></ul>
 
 <!-- CHAT -->
@@ -174,97 +63,74 @@ button.acao {
   </div>
 </div>
 
-<!-- LEAFLET JS -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <script>
-// MAPA
-let map = L.map('map').setView([-23.55, -46.63], 14);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; OpenStreetMap contributors'
-}).addTo(map);
+let map = L.map('map').setView([-23.55,-46.63],14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-let entregadorMarker = L.marker([-23.55, -46.63]).addTo(map).bindPopup("Você (entregador)").openPopup();
+let entregadorMarker = L.marker([-23.55,-46.63]).addTo(map).bindPopup("Você (entregador)").openPopup();
 let rotaControl = null;
-
 let saldo = 0;
 let corridas = [];
 let disponivel = true;
 
-// PEGAR LOCALIZAÇÃO REAL DO PC
-navigator.geolocation.getCurrentPosition(pos=>{
-  const lat = pos.coords.latitude;
-  const lng = pos.coords.longitude;
-  entregadorMarker.setLatLng([lat,lng]);
-  map.setView([lat,lng], 14);
-});
-
-// BOTAO DISPONIVEL/INDISPONIVEL
 const btnDisponivel = document.getElementById('btnDisponivel');
-btnDisponivel.addEventListener('click', () => {
+btnDisponivel.addEventListener('click', ()=>{
   disponivel = !disponivel;
-  if(disponivel) {
-    btnDisponivel.innerText = "Ficar Indisponível";
-    btnDisponivel.style.backgroundColor = "#2e7d32";
-  } else {
-    btnDisponivel.innerText = "Ficar Disponível";
-    btnDisponivel.style.backgroundColor = "#d32f2f";
-    if(rotaControl) { rotaControl.remove(); rotaControl = null; }
-  }
+  if(disponivel){ btnDisponivel.innerText="Ficar Indisponível"; btnDisponivel.style.backgroundColor="#2e7d32"; } 
+  else { btnDisponivel.innerText="Ficar Disponível"; btnDisponivel.style.backgroundColor="#d32f2f"; if(rotaControl) {rotaControl.remove(); rotaControl=null;} }
   atualizarLista();
 });
 
-// TEMPO
-function tempoUso(ms) {
-  let seg = Math.floor(ms/1000);
-  return `${Math.floor(seg/60)}m ${seg%60}s`;
-}
+// Pegando geolocalização real
+navigator.geolocation.getCurrentPosition(pos=>{
+  entregadorMarker.setLatLng([pos.coords.latitude,pos.coords.longitude]);
+  map.setView([pos.coords.latitude,pos.coords.longitude],14);
+});
 
-// GERAR CÓDIGO ALEATORIO
-function gerarCodigo(tipo){
-  return tipo + Math.floor(Math.random()*9000 + 1000);
-}
+// Helper
+function gerarCodigo(tipo){ return tipo+Math.floor(Math.random()*9000+1000); }
+function tempoUso(ms){ let seg=Math.floor(ms/1000); return `${Math.floor(seg/60)}m ${seg%60}s`; }
 
-// CRIAR CORRIDA ALEATORIA
-function criarCorrida() {
+// Criar corrida próxima do entregador
+function criarCorrida(){
   if(!disponivel) return;
-
-  const origem = [-23.55 + Math.random()/100, -46.63 + Math.random()/100];
-  const destino = [-23.56 + Math.random()/100, -46.64 + Math.random()/100];
-  const valor = (Math.random()*15 + 5).toFixed(2);
+  const pos = entregadorMarker.getLatLng();
+  const origem = [pos.lat + (Math.random()-0.5)/100, pos.lng + (Math.random()-0.5)/100];
+  const destino = [pos.lat + (Math.random()-0.5)/100, pos.lng + (Math.random()-0.5)/100];
+  const valor = (Math.random()*15+5).toFixed(2);
   const criado = Date.now();
-
-  const pontoColeta = L.latLng(origem[0], origem[1]);
-  const pontoEntrega = L.latLng(destino[0], destino[1]);
-  const entregadorPos = entregadorMarker.getLatLng();
-
-  const distanciaColeta = (entregadorPos.distanceTo(pontoColeta)/1000).toFixed(2);
-  const distanciaEntrega = (pontoColeta.distanceTo(pontoEntrega)/1000).toFixed(2);
-  const estimativa = (distanciaColeta+distanciaEntrega)*3 + 5; // minutos aproximado
-
   const codigoColeta = gerarCodigo('COLETA');
   const codigoEntrega = gerarCodigo('ENTREGA');
 
-  const corrida = {origem, destino, valor, criado, status:'disponivel', distanciaColeta, distanciaEntrega, estimativa: Math.round(estimativa), codigoColeta, codigoEntrega};
-  corridas.unshift(corrida);
+  const distanciaColeta = (L.latLng(pos.lat,pos.lng).distanceTo(L.latLng(origem[0],origem[1]))/1000).toFixed(2);
+  const distanciaEntrega = (L.latLng(origem[0],origem[1]).distanceTo(L.latLng(destino[0],destino[1]))/1000).toFixed(2);
+  const estimativa = Math.round((parseFloat(distanciaColeta)+parseFloat(distanciaEntrega))*3+5);
+
+  corridas.unshift({origem,destino,valor,criado,status:'disponivel',distanciaColeta,distanciaEntrega,estimativa,codigoColeta,codigoEntrega,coletaConfirmada:false});
   atualizarLista();
+  tocarNotificacao();
 }
 
-// ATUALIZAR LISTA
-function atualizarLista() {
+// Atualizar lista
+function atualizarLista(){
   const lista = document.getElementById('lista');
-  lista.innerHTML = '';
-  corridas.forEach((c, idx) => {
-    let botao = '';
-    let codigoDisplay = '';
-    if(c.status==='disponivel' && disponivel) {
-      botao = `<button class="acao" onclick="aceitarCorrida(${idx})">Aceitar</button>`;
-    } else if(c.status==='aceita') {
-      botao = `<button class="acao" onclick="cancelarCorrida(${idx})" style="background-color:#d32f2f">Cancelar</button>`;
-      codigoDisplay = `<div class="codigo"><b>Código Coleta:</b> ${c.codigoColeta}</div>`;
+  lista.innerHTML='';
+  corridas.forEach((c,idx)=>{
+    let botao=''; let codigoDisplay='';
+    if(c.status==='disponivel' && disponivel) botao=`<button class="acao" onclick="aceitarCorrida(${idx})">Aceitar</button>`;
+    else if(c.status==='aceita' && !c.coletaConfirmada){
+      codigoDisplay=`<div class="codigo"><b>Código Coleta:</b> ${c.codigoColeta}</div>
+      <input type="text" placeholder="Digite o código" class="codigo-coleta" id="input${idx}">
+      <button class="confirmar" onclick="confirmarColeta(${idx})">Confirmar coleta</button>`;
     }
-    lista.innerHTML += `
+    else if(c.status==='aceita' && c.coletaConfirmada){ 
+      botao=`<button class="acao" onclick="cancelarCorrida(${idx})" style="background-color:#d32f2f">Cancelar</button>`;
+      codigoDisplay=`<div class="codigo"><b>Coleta confirmada</b></div>`;
+    }
+    lista.innerHTML+=`
       <li>
         <div class="status ${c.status}">Status: ${c.status}</div>
         <div class="valor">Valor: R$ ${c.valor}</div>
@@ -279,105 +145,71 @@ function atualizarLista() {
   });
 }
 
-// ACEITAR CORRIDA
-function aceitarCorrida(idx) {
-  if(!disponivel) return alert("Você está indisponível!");
-  const c = corridas[idx];
-  c.status = 'aceita';
-  atualizarLista();
-
-  if(rotaControl) rotaControl.remove();
-  rotaControl = L.Routing.control({
-    waypoints: [
-      entregadorMarker.getLatLng(),
-      L.latLng(c.destino[0], c.destino[1])
-    ],
-    routeWhileDragging: true
-  }).addTo(map);
-
-  // envia código de entrega no chat
-  adicionarMensagem('Cliente', `Código de entrega: ${c.codigoEntrega}`);
-
-  animarEntrega(entregadorMarker.getLatLng(), c.destino, idx, parseFloat(c.valor));
-}
-
-// CANCELAR CORRIDA
-function cancelarCorrida(idx) {
-  const c = corridas[idx];
-  if(c.status==='aceita') {
-    c.status = 'cancelada';
+// Confirmar coleta
+function confirmarColeta(idx){
+  const c=corridas[idx];
+  const input=document.getElementById('input'+idx);
+  if(input.value.trim()===c.codigoColeta){
+    c.coletaConfirmada=true;
     atualizarLista();
-    if(rotaControl) { rotaControl.remove(); rotaControl = null; }
+    // envia código de entrega para o cliente
+    adicionarMensagem('Cliente',`Código de entrega: ${c.codigoEntrega}`);
+    animarRotaReal(idx);
+  } else {
+    alert("Código incorreto!");
   }
 }
 
-// ANIMACAO ENTREGADOR
-function animarEntrega(origemLatLng, destinoLatLng, idx, valor) {
-  let passo = 0;
-  const passos = 100;
-  const deltaLat = (destinoLatLng[0]-origemLatLng.lat)/passos;
-  const deltaLng = (destinoLatLng[1]-origemLatLng.lng)/passos;
+// Aceitar corrida
+function aceitarCorrida(idx){
+  if(!disponivel) return alert("Você está indisponível!");
+  corridas[idx].status='aceita'; atualizarLista();
+}
 
+// Cancelar
+function cancelarCorrida(idx){ const c=corridas[idx]; if(c.status==='aceita'){ c.status='cancelada'; atualizarLista(); if(rotaControl){rotaControl.remove(); rotaControl=null;} }}
+
+// Animação seguindo rota real
+function animarRotaReal(idx){
+  const c = corridas[idx];
+  if(rotaControl) rotaControl.remove();
+  rotaControl = L.Routing.control({ waypoints:[entregadorMarker.getLatLng(),L.latLng(c.destino[0],c.destino[1])], routeWhileDragging:true }).addTo(map);
+
+  const control = rotaControl.getPlan();
+  const line = control._line._latlngs;
+  let i=0;
   const anim = setInterval(()=>{
-    if(!disponivel) { clearInterval(anim); return; }
-    passo++;
-    const novaLat = entregadorMarker.getLatLng().lat + deltaLat;
-    const novaLng = entregadorMarker.getLatLng().lng + deltaLng;
-    entregadorMarker.setLatLng([novaLat, novaLng]);
-    map.setView([novaLat, novaLng]);
-
-    if(passo>=passos) {
-      clearInterval(anim);
-      const c = corridas[idx];
-      if(c.status==='aceita') {
-        c.status = 'concluida';
-        saldo += valor;
-        document.getElementById('saldo').innerText = `Saldo: R$ ${saldo.toFixed(2)}`;
-        if(rotaControl) { rotaControl.remove(); rotaControl = null; }
-        atualizarLista();
-      }
-    }
-  }, 100);
+    if(!disponivel){ clearInterval(anim); return; }
+    if(i>=line.length){ clearInterval(anim); finalizarCorrida(idx); return; }
+    entregadorMarker.setLatLng(line[i]);
+    const distColeta = L.latLng(line[i]).distanceTo(L.latLng(c.origem[0],c.origem[1]))/1000;
+    const distEntrega = L.latLng(line[i]).distanceTo(L.latLng(c.destino[0],c.destino[1]))/1000;
+    c.distanciaColeta = distColeta.toFixed(2);
+    c.distanciaEntrega = distEntrega.toFixed(2);
+    atualizarLista();
+    i++;
+  },200);
 }
 
-// GERAR CORRIDAS AUTOMATICAS
-setInterval(criarCorrida, 5000);
+// Finalizar corrida
+function finalizarCorrida(idx){ const c=corridas[idx]; c.status='concluida'; saldo+=parseFloat(c.valor); document.getElementById('saldo').innerText=`Saldo: R$ ${saldo.toFixed(2)}`; atualizarLista(); if(rotaControl){rotaControl.remove(); rotaControl=null;}}
+
+// Notificação sonora
+function tocarNotificacao(){ const audio=new Audio('https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg'); audio.play(); }
+
+// ================= CHAT =================
+const chatMessages=document.getElementById('chat-messages');
+const chatInput=document.getElementById('chat-input');
+const chatSend=document.getElementById('chat-send');
+chatSend.addEventListener('click',enviarMensagem);
+chatInput.addEventListener('keypress',(e)=>{if(e.key==='Enter') enviarMensagem();});
+function enviarMensagem(){ const msg=chatInput.value.trim(); if(!msg) return; adicionarMensagem('Você',msg); chatInput.value=''; setTimeout(()=>{ adicionarMensagem('Cliente',respostasFake()); },1000);}
+function adicionarMensagem(remetente,msg){ const div=document.createElement('div'); div.style.marginBottom='6px'; div.innerHTML=`<b>${remetente}:</b> ${msg}`; chatMessages.appendChild(div); chatMessages.scrollTop=chatMessages.scrollHeight;}
+function respostasFake(){ const r=['Obrigado, estou aguardando!','Pode me informar o tempo estimado?','Tudo certo, obrigado!','Ok, entendi.','Estou na porta, obrigado!']; return r[Math.floor(Math.random()*r.length)];}
+
+// Corridas automáticas
+setInterval(criarCorrida,5000);
 for(let i=0;i<3;i++) criarCorrida();
-
-// ===================== CHAT =====================
-const chatMessages = document.getElementById('chat-messages');
-const chatInput = document.getElementById('chat-input');
-const chatSend = document.getElementById('chat-send');
-
-chatSend.addEventListener('click', enviarMensagem);
-chatInput.addEventListener('keypress', (e)=>{ if(e.key==='Enter') enviarMensagem(); });
-
-function enviarMensagem(){
-  const msg = chatInput.value.trim();
-  if(!msg) return;
-  adicionarMensagem('Você', msg);
-  chatInput.value = '';
-  setTimeout(()=>{ adicionarMensagem('Cliente', respostasFake()); }, 1000);
-}
-
-function adicionarMensagem(remetente, msg){
-  const div = document.createElement('div');
-  div.style.marginBottom = '6px';
-  div.innerHTML = `<b>${remetente}:</b> ${msg}`;
-  chatMessages.appendChild(div);
-  chatMessages.scrollTop = chatMessages.scrollHeight;
-}
-
-function respostasFake(){
-  const respostas = [
-    'Obrigado, estou aguardando!',
-    'Pode me informar o tempo estimado?',
-    'Tudo certo, obrigado!',
-    'Ok, entendi.',
-    'Estou na porta, obrigado!'
-  ];
-  return respostas[Math.floor(Math.random()*respostas.length)];
-}
 </script>
 
 </body>

@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>iFood Simulado</title>
+<title>Simulador iFood Entregador</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
@@ -16,16 +16,12 @@
   --cinza: #f2f2f2;
   --vermelho: #d32f2f;
 }
-
 body { margin:0; font-family:Arial,sans-serif; background: var(--cinza); }
 header { background: var(--azul); color:white; padding:16px; display:flex; justify-content:space-between; align-items:center; font-weight:bold; position:sticky; top:0; z-index:1000; }
 #saldo { font-weight: normal; font-size:16px; }
 #map { width:100%; height:350px; margin:10px 0; border-radius:10px; }
 ul { list-style:none; padding:10px; margin:0; }
 li { background:white; padding:14px; margin-bottom:12px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,.1); display:flex; flex-direction:column; position:relative; transition: all 0.3s ease; }
-li.flash { animation: flash 0.6s; }
-@keyframes flash { 0%{background:#fff;}50%{background:#ff8c00;}100%{background:#fff;} }
-
 .status { font-weight:bold; margin-bottom:6px; }
 .status.disponivel { color: var(--verde); }
 .status.aceita { color: var(--laranja); }
@@ -49,8 +45,8 @@ button.confirmar { background:var(--verde); color:white; border:none; padding:8p
 <body>
 
 <header>
-  🚴 iFood Simulado
-  <div id="saldo">Saldo: R$ 0,00</div>
+  🚴 Simulador iFood
+  <div id="saldo">Saldo: R$ 0,00 | Score: 🟢</div>
 </header>
 
 <button id="btnDisponivel">Ficar Indisponível</button>
@@ -70,15 +66,16 @@ button.confirmar { background:var(--verde); color:white; border:none; padding:8p
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <script>
+// --- Configuração inicial ---
 let map = L.map('map').setView([-23.55,-46.63],14);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
 let entregadorMarker = L.marker([-23.55,-46.63]).addTo(map).bindPopup("Você (entregador)").openPopup();
 let rotaControl = null;
 let saldo = 0;
+let score = "🟢";
 let corridas = [];
 let disponivel = true;
-const MAX_PEDIDOS = 3;
 
 const btnDisponivel = document.getElementById('btnDisponivel');
 btnDisponivel.addEventListener('click', ()=>{
@@ -94,12 +91,13 @@ navigator.geolocation.getCurrentPosition(pos=>{
   map.setView([pos.coords.latitude,pos.coords.longitude],14);
 });
 
+// --- Funções ---
 function gerarCodigo(tipo){ return tipo+Math.floor(Math.random()*9000+1000); }
 function tempoUso(ms){ let seg=Math.floor(ms/1000); return `${Math.floor(seg/60)}m ${seg%60}s`; }
 
 function criarCorrida(){
   if(!disponivel) return;
-  if(corridas.filter(c=>c.status==='disponivel').length>=MAX_PEDIDOS) return;
+  if(corridas.filter(c=>c.status==='disponivel').length>=2) return;
   const pos = entregadorMarker.getLatLng();
   const origem = [pos.lat + (Math.random()-0.5)/100, pos.lng + (Math.random()-0.5)/100];
   const destino = [pos.lat + (Math.random()-0.5)/100, pos.lng + (Math.random()-0.5)/100];
@@ -147,6 +145,7 @@ function atualizarLista(flash=false){
       ${botao}
     </li>`;
   });
+  document.getElementById('saldo').innerText=`Saldo: R$ ${saldo.toFixed(2)} | Score: ${score}`;
 }
 
 function aceitarCorrida(idx){
@@ -195,13 +194,20 @@ function finalizarCorrida(idx){
   const c=corridas[idx]; 
   c.status='concluida'; 
   saldo+=parseFloat(c.valor); 
-  document.getElementById('saldo').innerText=`Saldo: R$ ${saldo.toFixed(2)}`; 
+  atualizarScore();
   atualizarLista(); 
   if(rotaControl){rotaControl.remove(); rotaControl=null;} 
 }
 
-function tocarNotificacao(){ const audio=new Audio('https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg'); audio.play(); }
+function atualizarScore(){
+  const concluida = corridas.filter(c=>c.status==='concluida').length;
+  const canceladas = corridas.filter(c=>c.status==='cancelada').length;
+  if(canceladas===0 && concluida>=3) score="🟢";
+  else if(canceladas>0 && canceladas<=2) score="🟡";
+  else if(canceladas>2) score="🔴";
+}
 
+// Chat
 const chatMessages=document.getElementById('chat-messages');
 const chatInput=document.getElementById('chat-input');
 const chatSend=document.getElementById('chat-send');
@@ -211,6 +217,9 @@ function enviarMensagem(){ const msg=chatInput.value.trim(); if(!msg) return; ad
 function adicionarMensagem(remetente,msg){ const div=document.createElement('div'); div.style.marginBottom='6px'; div.innerHTML=`<b>${remetente}:</b> ${msg}`; chatMessages.appendChild(div); chatMessages.scrollTop=chatMessages.scrollHeight;}
 function respostasFake(){ const r=['Obrigado, estou aguardando!','Pode me informar o tempo estimado?','Tudo certo, obrigado!','Ok, entendi.','Estou na porta, obrigado!']; return r[Math.floor(Math.random()*r.length)];}
 
+function tocarNotificacao(){ const audio=new Audio('https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg'); audio.play(); }
+
+// Simula criação de pedidos
 setInterval(criarCorrida,5000);
 for(let i=0;i<2;i++) criarCorrida();
 </script>

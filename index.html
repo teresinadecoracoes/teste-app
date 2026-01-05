@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>App Entregas Ultra Realista</title>
+<title>App Entregas Realista</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
@@ -15,35 +15,35 @@
   --laranja: #f57c00;
   --cinza: #f2f2f2;
   --vermelho: #d32f2f;
-  --branco: #fff;
 }
 
 body { margin:0; font-family:Arial, sans-serif; background: var(--cinza); }
-header { background: var(--azul); color:white; padding:16px; display:flex; justify-content:space-between; align-items:center; font-weight:bold; position:sticky; top:0; }
+header { background: var(--azul); color:white; padding:16px; display:flex; justify-content:space-between; align-items:center; font-weight:bold; position:sticky; top:0; z-index:1000; }
 #saldo { font-weight: normal; font-size:16px; }
 #map { width:100%; height:300px; margin:10px 0; border-radius:10px; }
 ul { list-style:none; padding:10px; }
-li { background:white; padding:14px; margin-bottom:12px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,.1); display:flex; flex-direction:column; position:relative; }
+li { background:white; padding:14px; margin-bottom:12px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,.1); display:flex; flex-direction:column; position:relative; transition: all 0.3s ease; }
+li.flash { animation: flash 0.6s; }
+@keyframes flash { 0%{background:#fff;}50%{background:#f57c00;}100%{background:#fff;} }
+
 .status { font-weight:bold; margin-bottom:6px; }
 .status.disponivel { color: var(--verde); }
 .status.aceita { color: var(--laranja); }
 .status.concluida { color: gray; }
 .status.cancelada { color: var(--vermelho); }
-.tempo, .valor, .distancia, .estimativa, .codigo { font-size:14px; color:#555; }
+.tempo, .valor, .distancia, .estimativa, .codigo, .restante { font-size:14px; color:#555; }
 button.acao { margin-top:8px; background:var(--laranja); color:white; border:none; padding:10px; border-radius:6px; cursor:pointer; font-weight:bold; }
+button.finalizar { background:var(--azul); color:white; border:none; padding:8px; border-radius:4px; margin-top:6px; cursor:pointer; font-weight:bold; }
 #btnDisponivel { width:90%; margin:10px auto; display:block; padding:14px; background: var(--verde); color:white; border:none; border-radius:8px; font-size:16px; cursor:pointer; }
 
-input.codigo-coleta { margin-top:6px; padding:6px; border-radius:4px; border:1px solid #ccc; }
+input.codigo-coleta, input.codigo-entrega { margin-top:6px; padding:6px; border-radius:4px; border:1px solid #ccc; }
 button.confirmar { background:var(--verde); color:white; border:none; padding:8px; border-radius:4px; margin-top:6px; cursor:pointer; font-weight:bold; }
-button.finalizar { background:var(--azul); color:white; border:none; padding:8px; border-radius:4px; margin-top:6px; cursor:pointer; font-weight:bold; }
 
 #chat-container { position: fixed; bottom: 0; right:0; width:300px; height:400px; background:white; border:1px solid #ccc; border-radius:10px; display:flex; flex-direction:column; box-shadow:0 2px 10px rgba(0,0,0,0.2); z-index:999; }
 #chat-header { background: var(--azul); color:white; padding:10px; font-weight:bold; border-top-left-radius:10px; border-top-right-radius:10px; }
 #chat-messages { flex:1; padding:10px; overflow-y:auto; }
 #chat-input { flex:1; padding:8px; border:none; }
 #chat-send { background: var(--azul); color:white; border:none; padding:8px; cursor:pointer; }
-.flash { animation: flash 0.5s; }
-@keyframes flash { 0%{background: #fff; }50%{background:#f57c00;}100%{background:#fff;} }
 </style>
 </head>
 <body>
@@ -85,7 +85,7 @@ const btnDisponivel = document.getElementById('btnDisponivel');
 btnDisponivel.addEventListener('click', ()=>{
   disponivel = !disponivel;
   if(disponivel){ btnDisponivel.innerText="Ficar Indisponível"; btnDisponivel.style.backgroundColor="#2e7d32"; } 
-  else { btnDisponivel.innerText="Ficar Disponível"; btnDisponivel.style.backgroundColor="#d32f2f"; if(rotaControl) {rotaControl.remove(); rotaControl=null;} }
+  else { btnDisponivel.innerText="Ficar Disponível"; btnDisponivel.style.backgroundColor="#d32f2f"; if(rotaControl){rotaControl.remove(); rotaControl=null;} }
   atualizarLista();
 });
 
@@ -95,14 +95,13 @@ navigator.geolocation.getCurrentPosition(pos=>{
   map.setView([pos.coords.latitude,pos.coords.longitude],14);
 });
 
-// Helper
 function gerarCodigo(tipo){ return tipo+Math.floor(Math.random()*9000+1000); }
 function tempoUso(ms){ let seg=Math.floor(ms/1000); return `${Math.floor(seg/60)}m ${seg%60}s`; }
 
-// Criar corrida próxima do entregador
+// Criar corrida
 function criarCorrida(){
   if(!disponivel) return;
-  if(corridas.filter(c=>c.status==='disponivel').length>=MAX_PEDIDOS) return; // limita pedidos
+  if(corridas.filter(c=>c.status==='disponivel').length>=MAX_PEDIDOS) return;
   const pos = entregadorMarker.getLatLng();
   const origem = [pos.lat + (Math.random()-0.5)/100, pos.lng + (Math.random()-0.5)/100];
   const destino = [pos.lat + (Math.random()-0.5)/100, pos.lng + (Math.random()-0.5)/100];
@@ -115,35 +114,37 @@ function criarCorrida(){
   const distanciaEntrega = (L.latLng(origem[0],origem[1]).distanceTo(L.latLng(destino[0],destino[1]))/1000).toFixed(2);
   const estimativa = Math.round((parseFloat(distanciaColeta)+parseFloat(distanciaEntrega))*3+5);
 
-  corridas.unshift({origem,destino,valor,criado,status:'disponivel',distanciaColeta,distanciaEntrega,estimativa,codigoColeta,codigoEntrega,coletaConfirmada:false});
-  atualizarLista();
+  corridas.unshift({origem,destino,valor,criado,status:'disponivel',distanciaColeta,distanciaEntrega,estimativa,codigoColeta,codigoEntrega,coletaConfirmada:false,entregaConfirmada:false});
+  atualizarLista(true);
   tocarNotificacao();
 }
 
-// Atualizar lista
-function atualizarLista(){
+function atualizarLista(flash=false){
   const lista = document.getElementById('lista');
   lista.innerHTML='';
   corridas.forEach((c,idx)=>{
-    let botao=''; let codigoDisplay='';
+    let botao=''; let codigoDisplay=''; let restante='';
     if(c.status==='disponivel' && disponivel) botao=`<button class="acao" onclick="aceitarCorrida(${idx})">Aceitar</button>`;
     else if(c.status==='aceita' && !c.coletaConfirmada){
       codigoDisplay=`<div class="codigo"><b>Código Coleta:</b> ${c.codigoColeta}</div>
       <input type="text" placeholder="Digite o código" class="codigo-coleta" id="input${idx}">
       <button class="confirmar" onclick="confirmarColeta(${idx})">Confirmar coleta</button>`;
     }
-    else if(c.status==='aceita' && c.coletaConfirmada){ 
-      botao=`<button class="finalizar" onclick="finalizarCorrida(${idx})">Finalizar Corrida</button>`;
-      codigoDisplay=`<div class="codigo"><b>Coleta confirmada</b></div>`;
+    else if(c.status==='aceita' && c.coletaConfirmada && !c.entregaConfirmada){
+      codigoDisplay=`<div class="codigo"><b>Código de Entrega:</b> ${c.codigoEntrega}</div>
+      <input type="text" placeholder="Digite código entrega" class="codigo-entrega" id="inputEntrega${idx}">
+      <button class="confirmar" onclick="confirmarEntrega(${idx})">Confirmar Entrega</button>`;
     }
     else if(c.status==='concluida') codigoDisplay=`<div class="codigo"><b>Corrida concluída</b></div>`;
-    lista.innerHTML+=`<li class="${c.status==='disponivel'?'flash':''}">
+    restante = c.coletaConfirmada ? `<div class="restante">Distância restante: ${c.distanciaEntrega} km</div>` : '';
+    lista.innerHTML+=`<li class="${flash && c.status==='disponivel'?'flash':''}">
       <div class="status ${c.status}">Status: ${c.status}</div>
       <div class="valor">Valor: R$ ${c.valor}</div>
       <div class="distancia">Km até coleta: ${c.distanciaColeta}</div>
       <div class="distancia">Km de entrega: ${c.distanciaEntrega}</div>
       <div class="estimativa">Tempo estimado: ${c.estimativa} min</div>
       ${codigoDisplay}
+      ${restante}
       <div class="tempo">Tempo no app: ${tempoUso(Date.now()-c.criado)}</div>
       ${botao}
     </li>`;
@@ -157,11 +158,18 @@ function confirmarColeta(idx){
   if(input.value.trim()===c.codigoColeta){
     c.coletaConfirmada=true;
     atualizarLista();
-    adicionarMensagem('Cliente',`Código de entrega: ${c.codigoEntrega}`);
-    animarRotaReal(idx);
-  } else {
-    alert("Código incorreto!");
-  }
+    animarRotaParaEntrega(idx);
+  } else { alert("Código incorreto!"); }
+}
+
+// Confirmar entrega
+function confirmarEntrega(idx){
+  const c=corridas[idx];
+  const input=document.getElementById('inputEntrega'+idx);
+  if(input.value.trim()===c.codigoEntrega){
+    c.entregaConfirmada=true;
+    finalizarCorrida(idx);
+  } else { alert("Código incorreto!"); }
 }
 
 // Aceitar corrida
@@ -170,29 +178,23 @@ function aceitarCorrida(idx){
   corridas[idx].status='aceita'; atualizarLista();
 }
 
-// Cancelar
-function cancelarCorrida(idx){ const c=corridas[idx]; if(c.status==='aceita'){ c.status='cancelada'; atualizarLista(); if(rotaControl){rotaControl.remove(); rotaControl=null;} }}
-
-// Animação seguindo rota real
-function animarRotaReal(idx){
-  const c = corridas[idx];
+// Animação para entrega
+function animarRotaParaEntrega(idx){
+  const c=corridas[idx];
   if(rotaControl) rotaControl.remove();
-  rotaControl = L.Routing.control({ waypoints:[entregadorMarker.getLatLng(),L.latLng(c.destino[0],c.destino[1])], routeWhileDragging:true }).addTo(map);
-
+  rotaControl = L.Routing.control({ waypoints:[L.latLng(c.origem[0],c.origem[1]),L.latLng(c.destino[0],c.destino[1])], routeWhileDragging:true }).addTo(map);
   const control = rotaControl.getPlan();
   const line = control._line._latlngs;
   let i=0;
   const anim = setInterval(()=>{
     if(!disponivel){ clearInterval(anim); return; }
-    if(i>=line.length){ clearInterval(anim); finalizarCorrida(idx); return; }
+    if(i>=line.length){ clearInterval(anim); clearInterval(anim); return; }
     entregadorMarker.setLatLng(line[i]);
-    const distColeta = L.latLng(line[i]).distanceTo(L.latLng(c.origem[0],c.origem[1]))/1000;
     const distEntrega = L.latLng(line[i]).distanceTo(L.latLng(c.destino[0],c.destino[1]))/1000;
-    c.distanciaColeta = distColeta.toFixed(2);
     c.distanciaEntrega = distEntrega.toFixed(2);
     atualizarLista();
     i++;
-  },200);
+  },300);
 }
 
 // Finalizar corrida
@@ -219,7 +221,7 @@ function adicionarMensagem(remetente,msg){ const div=document.createElement('div
 function respostasFake(){ const r=['Obrigado, estou aguardando!','Pode me informar o tempo estimado?','Tudo certo, obrigado!','Ok, entendi.','Estou na porta, obrigado!']; return r[Math.floor(Math.random()*r.length)];}
 
 // Corridas automáticas
-setInterval(criarCorrida,3000);
+setInterval(criarCorrida,5000);
 for(let i=0;i<2;i++) criarCorrida();
 </script>
 

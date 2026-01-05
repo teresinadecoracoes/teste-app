@@ -1,1 +1,196 @@
 
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>App Entregas - Modo Teste</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  background: #f5f5f5;
+}
+h2 {
+  text-align: center;
+  margin: 10px;
+}
+#map {
+  width: 100%;
+  height: 350px;
+}
+button {
+  width: 95%;
+  margin: 8px auto;
+  display: block;
+  padding: 12px;
+  background: #2e7d32;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+}
+ul {
+  list-style: none;
+  padding: 10px;
+}
+li {
+  background: white;
+  margin-bottom: 8px;
+  padding: 10px;
+  border-radius: 6px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>🚴 App de Entregas (Modo Teste)</h2>
+
+<div id="map"></div>
+
+<button onclick="criarCorrida()">➕ Criar corrida teste</button>
+
+<ul id="lista"></ul>
+
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+/* 🔥 FIREBASE CONFIG */
+const firebaseConfig = {
+  apiKey: "SUA_API_KEY",
+  authDomain: "SEU_PROJETO.firebaseapp.com",
+  projectId: "SEU_PROJECT_ID"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* 🗺️ MAPA */
+let map;
+let entregadorMarker;
+let corridasMarkers = [];
+let directionsService;
+let directionsRenderer;
+
+/* 🚴 GPS REAL DO ENTREGADOR */
+function iniciarGPS() {
+  if (navigator.geolocation) {
+    navigator.geolocation.watchPosition(pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      const local = { lat, lng };
+
+      if (!entregadorMarker) {
+        entregadorMarker = new google.maps.Marker({
+          position: local,
+          map: map,
+          icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+          title: "Você (entregador)"
+        });
+        map.setCenter(local);
+      } else {
+        entregadorMarker.setPosition(local);
+      }
+    }, err => {
+      alert("Erro ao pegar GPS");
+    }, { enableHighAccuracy: true });
+  }
+}
+
+/* 🗺️ INICIAR MAPA */
+function iniciarMapa() {
+  map = new google.maps.Map(document.getElementById("map"), {
+    center: { lat: -23.55, lng: -46.63 },
+    zoom: 14
+  });
+
+  directionsService = new google.maps.DirectionsService();
+  directionsRenderer = new google.maps.DirectionsRenderer();
+  directionsRenderer.setMap(map);
+
+  iniciarGPS();
+  ouvirCorridas();
+}
+
+/* 🧪 CRIAR CORRIDA FAKE */
+function criarCorrida() {
+  const origem = {
+    lat: -23.55 + Math.random()/100,
+    lng: -46.63 + Math.random()/100
+  };
+  const destino = {
+    lat: -23.56 + Math.random()/100,
+    lng: -46.64 + Math.random()/100
+  };
+
+  db.collection("corridas").add({
+    origem,
+    destino,
+    status: "disponivel",
+    modo_teste: true
+  });
+}
+
+/* 👂 OUVIR CORRIDAS (TEMPO REAL) */
+function ouvirCorridas() {
+  db.collection("corridas")
+    .where("modo_teste", "==", true)
+    .onSnapshot(snapshot => {
+      corridasMarkers.forEach(m => m.setMap(null));
+      corridasMarkers = [];
+
+      document.getElementById("lista").innerHTML = "";
+
+      snapshot.forEach(doc => {
+        const c = doc.data();
+        const id = doc.id;
+
+        const marker = new google.maps.Marker({
+          position: c.origem,
+          map: map,
+          title: "Corrida disponível"
+        });
+        corridasMarkers.push(marker);
+
+        document.getElementById("lista").innerHTML += `
+          <li>
+            <b>Status:</b> ${c.status}<br>
+            <button onclick="aceitarCorrida('${id}', ${c.destino.lat}, ${c.destino.lng})">
+              Aceitar corrida
+            </button>
+          </li>
+        `;
+      });
+    });
+}
+
+/* ✅ ACEITAR CORRIDA + ROTA */
+function aceitarCorrida(id, dlat, dlng) {
+  db.collection("corridas").doc(id).update({
+    status: "aceita"
+  });
+
+  directionsService.route({
+    origin: entregadorMarker.getPosition(),
+    destination: { lat: dlat, lng: dlng },
+    travelMode: "DRIVING"
+  }, (res, status) => {
+    if (status === "OK") {
+      directionsRenderer.setDirections(res);
+    }
+  });
+
+  alert("Corrida aceita (modo teste)");
+}
+</script>
+
+<!-- GOOGLE MAPS -->
+<script
+src="https://maps.googleapis.com/maps/api/js?key=SUA_CHAVE_GOOGLE_MAPS&callback=iniciarMapa"
+async defer></script>
+
+</body>
+</html>

@@ -102,6 +102,52 @@ button.acao {
   font-size: 16px;
   cursor: pointer;
 }
+
+/* CHAT */
+#chat-container {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  width: 300px;
+  height: 400px;
+  background:white;
+  border:1px solid #ccc;
+  border-radius:10px;
+  display:flex;
+  flex-direction:column;
+  box-shadow:0 2px 10px rgba(0,0,0,0.2);
+  z-index: 999;
+}
+
+#chat-header {
+  background: var(--azul);
+  color:white;
+  padding:10px;
+  font-weight:bold;
+  border-top-left-radius:10px;
+  border-top-right-radius:10px;
+}
+
+#chat-messages {
+  flex:1;
+  padding:10px;
+  overflow-y:auto;
+}
+
+#chat-input {
+  flex:1;
+  padding:8px;
+  border:none;
+  border-radius:0;
+}
+
+#chat-send {
+  background: var(--azul);
+  color:white;
+  border:none;
+  padding:8px;
+  cursor:pointer;
+}
 </style>
 </head>
 
@@ -117,6 +163,16 @@ button.acao {
 <div id="map"></div>
 
 <ul id="lista"></ul>
+
+<!-- CHAT -->
+<div id="chat-container">
+  <div id="chat-header">Suporte Cliente</div>
+  <div id="chat-messages"></div>
+  <div style="display:flex;border-top:1px solid #ccc;">
+    <input id="chat-input" placeholder="Digite uma mensagem...">
+    <button id="chat-send">Enviar</button>
+  </div>
+</div>
 
 <!-- LEAFLET JS -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -134,7 +190,7 @@ let rotaControl = null;
 
 let saldo = 0;
 let corridas = [];
-let disponivel = true; // entregador disponível
+let disponivel = true;
 
 // BOTAO DISPONIVEL/INDISPONIVEL
 const btnDisponivel = document.getElementById('btnDisponivel');
@@ -146,11 +202,7 @@ btnDisponivel.addEventListener('click', () => {
   } else {
     btnDisponivel.innerText = "Ficar Disponível";
     btnDisponivel.style.backgroundColor = "#d32f2f";
-    // Remove rotas do mapa
-    if(rotaControl) {
-      rotaControl.remove();
-      rotaControl = null;
-    }
+    if(rotaControl) { rotaControl.remove(); rotaControl = null; }
   }
   atualizarLista();
 });
@@ -163,16 +215,22 @@ function tempoUso(ms) {
 
 // CRIAR CORRIDA ALEATORIA
 function criarCorrida() {
-  if(!disponivel) return; // não cria corrida se entregador indisponível
+  if(!disponivel) return;
 
   const origem = [-23.55 + Math.random()/100, -46.63 + Math.random()/100];
   const destino = [-23.56 + Math.random()/100, -46.64 + Math.random()/100];
   const valor = (Math.random()*15 + 5).toFixed(2);
   const criado = Date.now();
-  const distancia = (Math.random()*5 + 1).toFixed(1); // km
-  const estimativa = (distancia*3 + 5).toFixed(0); // minutos aproximado
 
-  const corrida = {origem, destino, valor, criado, status:'disponivel', distancia, estimativa};
+  const pontoColeta = L.latLng(origem[0], origem[1]);
+  const pontoEntrega = L.latLng(destino[0], destino[1]);
+  const entregadorPos = entregadorMarker.getLatLng();
+
+  const distanciaColeta = (entregadorPos.distanceTo(pontoColeta)/1000).toFixed(2);
+  const distanciaEntrega = (pontoColeta.distanceTo(pontoEntrega)/1000).toFixed(2);
+  const estimativa = (distanciaColeta+distanciaEntrega)*3 + 5; // minutos aproximado
+
+  const corrida = {origem, destino, valor, criado, status:'disponivel', distanciaColeta, distanciaEntrega, estimativa: Math.round(estimativa)};
   corridas.unshift(corrida);
   atualizarLista();
 }
@@ -192,7 +250,8 @@ function atualizarLista() {
       <li>
         <div class="status ${c.status}">Status: ${c.status}</div>
         <div class="valor">Valor: R$ ${c.valor}</div>
-        <div class="distancia">Distância: ${c.distancia} km</div>
+        <div class="distancia">Km até coleta: ${c.distanciaColeta}</div>
+        <div class="distancia">Km de entrega: ${c.distanciaEntrega}</div>
         <div class="estimativa">Tempo estimado: ${c.estimativa} min</div>
         <div class="tempo">Tempo no app: ${tempoUso(Date.now()-c.criado)}</div>
         ${botao}
@@ -209,7 +268,6 @@ function aceitarCorrida(idx) {
   c.status = 'aceita';
   atualizarLista();
 
-  // Rota no mapa
   if(rotaControl) rotaControl.remove();
   rotaControl = L.Routing.control({
     waypoints: [
@@ -219,7 +277,6 @@ function aceitarCorrida(idx) {
     routeWhileDragging: true
   }).addTo(map);
 
-  // Mover entregador animado
   animarEntrega(entregadorMarker.getLatLng(), c.destino, idx, parseFloat(c.valor));
 }
 
@@ -229,10 +286,7 @@ function cancelarCorrida(idx) {
   if(c.status==='aceita') {
     c.status = 'cancelada';
     atualizarLista();
-    if(rotaControl) {
-      rotaControl.remove();
-      rotaControl = null;
-    }
+    if(rotaControl) { rotaControl.remove(); rotaControl = null; }
   }
 }
 
@@ -253,7 +307,6 @@ function animarEntrega(origemLatLng, destinoLatLng, idx, valor) {
 
     if(passo>=passos) {
       clearInterval(anim);
-      // Corrida concluída
       const c = corridas[idx];
       if(c.status==='aceita') {
         c.status = 'concluida';
@@ -263,13 +316,47 @@ function animarEntrega(origemLatLng, destinoLatLng, idx, valor) {
         atualizarLista();
       }
     }
-  }, 100); // atualiza posição a cada 100ms
+  }, 100);
 }
 
 // GERAR CORRIDAS AUTOMATICAS
 setInterval(criarCorrida, 5000);
-for(let i=0;i<3;i++) criarCorrida(); // corridas iniciais
+for(let i=0;i<3;i++) criarCorrida();
 
+// ===================== CHAT =====================
+const chatMessages = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const chatSend = document.getElementById('chat-send');
+
+chatSend.addEventListener('click', enviarMensagem);
+chatInput.addEventListener('keypress', (e)=>{ if(e.key==='Enter') enviarMensagem(); });
+
+function enviarMensagem(){
+  const msg = chatInput.value.trim();
+  if(!msg) return;
+  adicionarMensagem('Você', msg);
+  chatInput.value = '';
+  setTimeout(()=>{ adicionarMensagem('Cliente', respostasFake()); }, 1000);
+}
+
+function adicionarMensagem(remetente, msg){
+  const div = document.createElement('div');
+  div.style.marginBottom = '6px';
+  div.innerHTML = `<b>${remetente}:</b> ${msg}`;
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function respostasFake(){
+  const respostas = [
+    'Obrigado, estou aguardando!',
+    'Pode me informar o tempo estimado?',
+    'Tudo certo, obrigado!',
+    'Ok, entendi.',
+    'Estou na porta, obrigado!'
+  ];
+  return respostas[Math.floor(Math.random()*respostas.length)];
+}
 </script>
 
 </body>

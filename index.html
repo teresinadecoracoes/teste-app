@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>App Entregas Realista</title>
+<title>iFood Simulado</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
@@ -10,21 +10,21 @@
 
 <style>
 :root {
-  --azul: #1976d2;
+  --azul: #d70020;
   --verde: #2e7d32;
-  --laranja: #f57c00;
+  --laranja: #ff8c00;
   --cinza: #f2f2f2;
   --vermelho: #d32f2f;
 }
 
-body { margin:0; font-family:Arial, sans-serif; background: var(--cinza); }
+body { margin:0; font-family:Arial,sans-serif; background: var(--cinza); }
 header { background: var(--azul); color:white; padding:16px; display:flex; justify-content:space-between; align-items:center; font-weight:bold; position:sticky; top:0; z-index:1000; }
 #saldo { font-weight: normal; font-size:16px; }
-#map { width:100%; height:300px; margin:10px 0; border-radius:10px; }
-ul { list-style:none; padding:10px; }
+#map { width:100%; height:350px; margin:10px 0; border-radius:10px; }
+ul { list-style:none; padding:10px; margin:0; }
 li { background:white; padding:14px; margin-bottom:12px; border-radius:10px; box-shadow:0 2px 6px rgba(0,0,0,.1); display:flex; flex-direction:column; position:relative; transition: all 0.3s ease; }
 li.flash { animation: flash 0.6s; }
-@keyframes flash { 0%{background:#fff;}50%{background:#f57c00;}100%{background:#fff;} }
+@keyframes flash { 0%{background:#fff;}50%{background:#ff8c00;}100%{background:#fff;} }
 
 .status { font-weight:bold; margin-bottom:6px; }
 .status.disponivel { color: var(--verde); }
@@ -49,7 +49,7 @@ button.confirmar { background:var(--verde); color:white; border:none; padding:8p
 <body>
 
 <header>
-  🚴 Entregador Online
+  🚴 iFood Simulado
   <div id="saldo">Saldo: R$ 0,00</div>
 </header>
 
@@ -57,7 +57,6 @@ button.confirmar { background:var(--verde); color:white; border:none; padding:8p
 <div id="map"></div>
 <ul id="lista"></ul>
 
-<!-- CHAT -->
 <div id="chat-container">
   <div id="chat-header">Suporte Cliente</div>
   <div id="chat-messages"></div>
@@ -98,7 +97,6 @@ navigator.geolocation.getCurrentPosition(pos=>{
 function gerarCodigo(tipo){ return tipo+Math.floor(Math.random()*9000+1000); }
 function tempoUso(ms){ let seg=Math.floor(ms/1000); return `${Math.floor(seg/60)}m ${seg%60}s`; }
 
-// Criar corrida
 function criarCorrida(){
   if(!disponivel) return;
   if(corridas.filter(c=>c.status==='disponivel').length>=MAX_PEDIDOS) return;
@@ -151,7 +149,11 @@ function atualizarLista(flash=false){
   });
 }
 
-// Confirmar coleta
+function aceitarCorrida(idx){
+  if(!disponivel) return alert("Você está indisponível!");
+  corridas[idx].status='aceita'; atualizarLista();
+}
+
 function confirmarColeta(idx){
   const c=corridas[idx];
   const input=document.getElementById('input'+idx);
@@ -162,7 +164,6 @@ function confirmarColeta(idx){
   } else { alert("Código incorreto!"); }
 }
 
-// Confirmar entrega
 function confirmarEntrega(idx){
   const c=corridas[idx];
   const input=document.getElementById('inputEntrega'+idx);
@@ -172,13 +173,6 @@ function confirmarEntrega(idx){
   } else { alert("Código incorreto!"); }
 }
 
-// Aceitar corrida
-function aceitarCorrida(idx){
-  if(!disponivel) return alert("Você está indisponível!");
-  corridas[idx].status='aceita'; atualizarLista();
-}
-
-// Animação para entrega
 function animarRotaParaEntrega(idx){
   const c=corridas[idx];
   if(rotaControl) rotaControl.remove();
@@ -188,7 +182,7 @@ function animarRotaParaEntrega(idx){
   let i=0;
   const anim = setInterval(()=>{
     if(!disponivel){ clearInterval(anim); return; }
-    if(i>=line.length){ clearInterval(anim); clearInterval(anim); return; }
+    if(i>=line.length){ clearInterval(anim); return; }
     entregadorMarker.setLatLng(line[i]);
     const distEntrega = L.latLng(line[i]).distanceTo(L.latLng(c.destino[0],c.destino[1]))/1000;
     c.distanciaEntrega = distEntrega.toFixed(2);
@@ -197,7 +191,6 @@ function animarRotaParaEntrega(idx){
   },300);
 }
 
-// Finalizar corrida
 function finalizarCorrida(idx){ 
   const c=corridas[idx]; 
   c.status='concluida'; 
@@ -207,10 +200,8 @@ function finalizarCorrida(idx){
   if(rotaControl){rotaControl.remove(); rotaControl=null;} 
 }
 
-// Notificação sonora
 function tocarNotificacao(){ const audio=new Audio('https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg'); audio.play(); }
 
-// ================= CHAT =================
 const chatMessages=document.getElementById('chat-messages');
 const chatInput=document.getElementById('chat-input');
 const chatSend=document.getElementById('chat-send');
@@ -220,7 +211,6 @@ function enviarMensagem(){ const msg=chatInput.value.trim(); if(!msg) return; ad
 function adicionarMensagem(remetente,msg){ const div=document.createElement('div'); div.style.marginBottom='6px'; div.innerHTML=`<b>${remetente}:</b> ${msg}`; chatMessages.appendChild(div); chatMessages.scrollTop=chatMessages.scrollHeight;}
 function respostasFake(){ const r=['Obrigado, estou aguardando!','Pode me informar o tempo estimado?','Tudo certo, obrigado!','Ok, entendi.','Estou na porta, obrigado!']; return r[Math.floor(Math.random()*r.length)];}
 
-// Corridas automáticas
 setInterval(criarCorrida,5000);
 for(let i=0;i<2;i++) criarCorrida();
 </script>

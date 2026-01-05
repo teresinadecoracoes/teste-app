@@ -14,6 +14,7 @@
   --verde: #2e7d32;
   --laranja: #f57c00;
   --cinza: #f2f2f2;
+  --vermelho: #d32f2f;
 }
 
 body {
@@ -22,7 +23,6 @@ body {
   background: var(--cinza);
 }
 
-/* HEADER */
 header {
   background: var(--azul);
   color: white;
@@ -32,7 +32,6 @@ header {
   font-weight: bold;
   position: sticky;
   top: 0;
-  z-index: 100;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -43,7 +42,6 @@ header {
   font-size: 16px;
 }
 
-/* MAPA */
 #map {
   width: 100%;
   height: 300px;
@@ -51,7 +49,6 @@ header {
   border-radius: 10px;
 }
 
-/* LISTA */
 ul {
   list-style: none;
   padding: 10px;
@@ -75,8 +72,9 @@ li {
 .status.disponivel { color: var(--verde); }
 .status.aceita { color: var(--laranja); }
 .status.concluida { color: gray; }
+.status.cancelada { color: var(--vermelho); }
 
-.tempo, .valor {
+.tempo, .valor, .distancia, .estimativa {
   font-size: 14px;
   color: #555;
 }
@@ -89,6 +87,20 @@ button.acao {
   padding: 10px;
   border-radius: 6px;
   cursor: pointer;
+  font-weight: bold;
+}
+
+#btnDisponivel {
+  width: 90%;
+  margin: 10px auto;
+  display: block;
+  padding: 14px;
+  background: var(--verde);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
 }
 </style>
 </head>
@@ -100,13 +112,14 @@ button.acao {
   <div id="saldo">Saldo: R$ 0,00</div>
 </header>
 
+<button id="btnDisponivel">Ficar Indisponível</button>
+
 <div id="map"></div>
 
 <ul id="lista"></ul>
 
 <!-- LEAFLET JS -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<!-- LEAFLET ROUTING -->
 <script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <script>
@@ -117,10 +130,30 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 let entregadorMarker = L.marker([-23.55, -46.63]).addTo(map).bindPopup("Você (entregador)").openPopup();
-let rotaControl;
+let rotaControl = null;
 
 let saldo = 0;
 let corridas = [];
+let disponivel = true; // entregador disponível
+
+// BOTAO DISPONIVEL/INDISPONIVEL
+const btnDisponivel = document.getElementById('btnDisponivel');
+btnDisponivel.addEventListener('click', () => {
+  disponivel = !disponivel;
+  if(disponivel) {
+    btnDisponivel.innerText = "Ficar Indisponível";
+    btnDisponivel.style.backgroundColor = "#2e7d32";
+  } else {
+    btnDisponivel.innerText = "Ficar Disponível";
+    btnDisponivel.style.backgroundColor = "#d32f2f";
+    // Remove rotas do mapa
+    if(rotaControl) {
+      rotaControl.remove();
+      rotaControl = null;
+    }
+  }
+  atualizarLista();
+});
 
 // TEMPO
 function tempoUso(ms) {
@@ -128,15 +161,19 @@ function tempoUso(ms) {
   return `${Math.floor(seg/60)}m ${seg%60}s`;
 }
 
-// CRIAR CORRIDA TESTE ALEATORIA
+// CRIAR CORRIDA ALEATORIA
 function criarCorrida() {
+  if(!disponivel) return; // não cria corrida se entregador indisponível
+
   const origem = [-23.55 + Math.random()/100, -46.63 + Math.random()/100];
   const destino = [-23.56 + Math.random()/100, -46.64 + Math.random()/100];
-  const valor = (Math.random()*15 + 5).toFixed(2); // valor entre 5 e 20
+  const valor = (Math.random()*15 + 5).toFixed(2);
   const criado = Date.now();
+  const distancia = (Math.random()*5 + 1).toFixed(1); // km
+  const estimativa = (distancia*3 + 5).toFixed(0); // minutos aproximado
 
-  const corrida = {origem, destino, valor, criado, status:'disponivel'};
-  corridas.unshift(corrida); // adiciona no começo
+  const corrida = {origem, destino, valor, criado, status:'disponivel', distancia, estimativa};
+  corridas.unshift(corrida);
   atualizarLista();
 }
 
@@ -146,13 +183,17 @@ function atualizarLista() {
   lista.innerHTML = '';
   corridas.forEach((c, idx) => {
     let botao = '';
-    if(c.status==='disponivel') {
-      botao = `<button class="acao" onclick="aceitarCorrida(${idx})">Aceitar corrida</button>`;
+    if(c.status==='disponivel' && disponivel) {
+      botao = `<button class="acao" onclick="aceitarCorrida(${idx})">Aceitar</button>`;
+    } else if(c.status==='aceita') {
+      botao = `<button class="acao" onclick="cancelarCorrida(${idx})" style="background-color:#d32f2f">Cancelar</button>`;
     }
     lista.innerHTML += `
       <li>
         <div class="status ${c.status}">Status: ${c.status}</div>
         <div class="valor">Valor: R$ ${c.valor}</div>
+        <div class="distancia">Distância: ${c.distancia} km</div>
+        <div class="estimativa">Tempo estimado: ${c.estimativa} min</div>
         <div class="tempo">Tempo no app: ${tempoUso(Date.now()-c.criado)}</div>
         ${botao}
       </li>
@@ -162,15 +203,14 @@ function atualizarLista() {
 
 // ACEITAR CORRIDA
 function aceitarCorrida(idx) {
+  if(!disponivel) return alert("Você está indisponível!");
+
   const c = corridas[idx];
   c.status = 'aceita';
-  saldo += parseFloat(c.valor);
-  document.getElementById('saldo').innerText = `Saldo: R$ ${saldo.toFixed(2)}`;
+  atualizarLista();
 
-  // remover rota anterior
+  // Rota no mapa
   if(rotaControl) rotaControl.remove();
-
-  // desenhar rota no mapa
   rotaControl = L.Routing.control({
     waypoints: [
       L.latLng(entregadorMarker.getLatLng().lat, entregadorMarker.getLatLng().lng),
@@ -179,14 +219,57 @@ function aceitarCorrida(idx) {
     routeWhileDragging: true
   }).addTo(map);
 
-  atualizarLista();
+  // Mover entregador animado
+  animarEntrega(entregadorMarker.getLatLng(), c.destino, idx, parseFloat(c.valor));
 }
 
-// GERAR CORRIDAS AUTOMÁTICAS A CADA 5 SEGUNDOS
-setInterval(criarCorrida, 5000);
+// CANCELAR CORRIDA
+function cancelarCorrida(idx) {
+  const c = corridas[idx];
+  if(c.status==='aceita') {
+    c.status = 'cancelada';
+    atualizarLista();
+    if(rotaControl) {
+      rotaControl.remove();
+      rotaControl = null;
+    }
+  }
+}
 
-// OPCIONAL: gerar algumas corridas iniciais
-for(let i=0;i<3;i++) criarCorrida();
+// ANIMACAO ENTREGADOR
+function animarEntrega(origemLatLng, destinoLatLng, idx, valor) {
+  let passo = 0;
+  const passos = 100;
+  const deltaLat = (destinoLatLng[0]-origemLatLng.lat)/passos;
+  const deltaLng = (destinoLatLng[1]-origemLatLng.lng)/passos;
+
+  const anim = setInterval(()=>{
+    if(!disponivel) { clearInterval(anim); return; }
+    passo++;
+    const novaLat = entregadorMarker.getLatLng().lat + deltaLat;
+    const novaLng = entregadorMarker.getLatLng().lng + deltaLng;
+    entregadorMarker.setLatLng([novaLat, novaLng]);
+    map.setView([novaLat, novaLng]);
+
+    if(passo>=passos) {
+      clearInterval(anim);
+      // Corrida concluída
+      const c = corridas[idx];
+      if(c.status==='aceita') {
+        c.status = 'concluida';
+        saldo += valor;
+        document.getElementById('saldo').innerText = `Saldo: R$ ${saldo.toFixed(2)}`;
+        if(rotaControl) { rotaControl.remove(); rotaControl = null; }
+        atualizarLista();
+      }
+    }
+  }, 100); // atualiza posição a cada 100ms
+}
+
+// GERAR CORRIDAS AUTOMATICAS
+setInterval(criarCorrida, 5000);
+for(let i=0;i<3;i++) criarCorrida(); // corridas iniciais
+
 </script>
 
 </body>

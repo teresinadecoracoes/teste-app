@@ -5,50 +5,50 @@
 <title>App Entregas - Modo Teste</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+<!-- LEAFLET CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
 <style>
 :root {
   --azul: #1976d2;
-  --azul-claro: #e3f2fd;
+  --verde: #2e7d32;
+  --laranja: #f57c00;
+  --cinza: #f2f2f2;
 }
 
 body {
   margin: 0;
   font-family: Arial, sans-serif;
-  background: #f2f2f2;
+  background: var(--cinza);
 }
 
 /* HEADER */
 header {
   background: var(--azul);
   color: white;
-  padding: 14px;
+  padding: 16px;
   text-align: center;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: bold;
   position: sticky;
   top: 0;
   z-index: 100;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#saldo {
+  font-weight: normal;
+  font-size: 16px;
 }
 
 /* MAPA */
 #map {
   width: 100%;
-  height: 320px;
-  margin-top: 10px;
+  height: 300px;
+  margin: 10px 0;
   border-radius: 10px;
-}
-
-/* BOTÃO */
-button {
-  width: 90%;
-  margin: 12px auto;
-  display: block;
-  padding: 14px;
-  background: var(--azul);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
 }
 
 /* LISTA */
@@ -59,162 +59,135 @@ ul {
 
 li {
   background: white;
-  padding: 12px;
-  margin-bottom: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
   border-radius: 10px;
   box-shadow: 0 2px 6px rgba(0,0,0,.1);
+  display: flex;
+  flex-direction: column;
 }
 
 .status {
   font-weight: bold;
-  color: var(--azul);
+  margin-bottom: 6px;
 }
 
-.tempo {
-  color: #555;
+.status.disponivel { color: var(--verde); }
+.status.aceita { color: var(--laranja); }
+.status.concluida { color: gray; }
+
+.tempo, .valor {
   font-size: 14px;
+  color: #555;
+}
+
+button.acao {
+  margin-top: 8px;
+  background: var(--laranja);
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
 }
 </style>
 </head>
 
 <body>
 
-<header>🚴 Entregador Online</header>
+<header>
+  🚴 Entregador Online
+  <div id="saldo">Saldo: R$ 0,00</div>
+</header>
 
 <div id="map"></div>
 
-<button onclick="criarCorrida()">➕ Criar corrida (teste)</button>
-
 <ul id="lista"></ul>
 
-<!-- FIREBASE -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<!-- LEAFLET JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<!-- LEAFLET ROUTING -->
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
 
 <script>
-/* 🔥 FIREBASE CONFIG */
-firebase.initializeApp({
-  apiKey: "SUA_API_KEY",
-  authDomain: "SEU_PROJETO.firebaseapp.com",
-  projectId: "SEU_PROJECT_ID"
-});
-const db = firebase.firestore();
+// MAPA
+let map = L.map('map').setView([-23.55, -46.63], 14);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
 
-/* MAPA */
-let map;
-let entregadorMarker;
-let directionsService;
-let directionsRenderer;
-let inicioUso = Date.now();
+let entregadorMarker = L.marker([-23.55, -46.63]).addTo(map).bindPopup("Você (entregador)").openPopup();
+let rotaControl;
 
-/* TEMPO DE USO */
-function tempoUso() {
-  let seg = Math.floor((Date.now() - inicioUso) / 1000);
+let saldo = 0;
+let corridas = [];
+
+// TEMPO
+function tempoUso(ms) {
+  let seg = Math.floor(ms/1000);
   return `${Math.floor(seg/60)}m ${seg%60}s`;
 }
 
-/* INICIAR GPS */
-function iniciarGPS() {
-  if (navigator.geolocation) {
-    navigator.geolocation.watchPosition(pos => {
-      const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      if (!entregadorMarker) {
-        entregadorMarker = new google.maps.Marker({
-          position: p,
-          map: map,
-          icon: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-          title: "Você (entregador)"
-        });
-        map.setCenter(p);
-      } else {
-        entregadorMarker.setPosition(p);
-      }
-    }, err => {
-      alert("Erro ao pegar GPS");
-    }, { enableHighAccuracy: true });
-  } else {
-    alert("GPS não suportado pelo navegador");
-  }
-}
-
-/* INICIAR MAPA */
-function iniciarMapa() {
-  map = new google.maps.Map(document.getElementById("map"), {
-    center: { lat: -23.55, lng: -46.63 },
-    zoom: 14
-  });
-  directionsService = new google.maps.DirectionsService();
-  directionsRenderer = new google.maps.DirectionsRenderer();
-  directionsRenderer.setMap(map);
-
-  iniciarGPS();
-  ouvirCorridas();
-}
-
-/* CRIAR CORRIDA TESTE */
+// CRIAR CORRIDA TESTE ALEATORIA
 function criarCorrida() {
-  const origem = {
-    lat: -23.55 + Math.random()/100,
-    lng: -46.63 + Math.random()/100
-  };
-  const destino = {
-    lat: -23.56 + Math.random()/100,
-    lng: -46.64 + Math.random()/100
-  };
+  const origem = [-23.55 + Math.random()/100, -46.63 + Math.random()/100];
+  const destino = [-23.56 + Math.random()/100, -46.64 + Math.random()/100];
+  const valor = (Math.random()*15 + 5).toFixed(2); // valor entre 5 e 20
+  const criado = Date.now();
 
-  db.collection("corridas").add({
-    origem,
-    destino,
-    status: "disponível",
-    criado: Date.now()
-  });
+  const corrida = {origem, destino, valor, criado, status:'disponivel'};
+  corridas.unshift(corrida); // adiciona no começo
+  atualizarLista();
 }
 
-/* OUVIR CORRIDAS (TEMPO REAL) */
-function ouvirCorridas() {
-  db.collection("corridas").orderBy("criado", "desc").onSnapshot(snapshot => {
-    document.getElementById("lista").innerHTML = "";
-    snapshot.forEach(doc => {
-      const c = doc.data();
-      const id = doc.id;
-
-      document.getElementById("lista").innerHTML += `
-        <li>
-          <div class="status">Status: ${c.status}</div>
-          <div class="tempo">Tempo no app: ${tempoUso()}</div>
-          <button onclick="aceitarCorrida('${id}', ${c.destino.lat}, ${c.destino.lng})">
-            Aceitar corrida
-          </button>
-        </li>
-      `;
-    });
-  });
-}
-
-/* ACEITAR CORRIDA E DESENHAR ROTA */
-function aceitarCorrida(id, dlat, dlng) {
-  db.collection("corridas").doc(id).update({
-    status: "aceita"
-  });
-
-  directionsService.route({
-    origin: entregadorMarker.getPosition(),
-    destination: { lat: dlat, lng: dlng },
-    travelMode: "DRIVING"
-  }, (res, status) => {
-    if (status === "OK") {
-      directionsRenderer.setDirections(res);
+// ATUALIZAR LISTA
+function atualizarLista() {
+  const lista = document.getElementById('lista');
+  lista.innerHTML = '';
+  corridas.forEach((c, idx) => {
+    let botao = '';
+    if(c.status==='disponivel') {
+      botao = `<button class="acao" onclick="aceitarCorrida(${idx})">Aceitar corrida</button>`;
     }
+    lista.innerHTML += `
+      <li>
+        <div class="status ${c.status}">Status: ${c.status}</div>
+        <div class="valor">Valor: R$ ${c.valor}</div>
+        <div class="tempo">Tempo no app: ${tempoUso(Date.now()-c.criado)}</div>
+        ${botao}
+      </li>
+    `;
   });
-
-  alert("Corrida aceita (modo teste)");
 }
-</script>
 
-<!-- GOOGLE MAPS -->
-<script
-src="https://maps.googleapis.com/maps/api/js?key=SUA_CHAVE_GOOGLE_MAPS&callback=iniciarMapa"
-async defer></script>
+// ACEITAR CORRIDA
+function aceitarCorrida(idx) {
+  const c = corridas[idx];
+  c.status = 'aceita';
+  saldo += parseFloat(c.valor);
+  document.getElementById('saldo').innerText = `Saldo: R$ ${saldo.toFixed(2)}`;
+
+  // remover rota anterior
+  if(rotaControl) rotaControl.remove();
+
+  // desenhar rota no mapa
+  rotaControl = L.Routing.control({
+    waypoints: [
+      L.latLng(entregadorMarker.getLatLng().lat, entregadorMarker.getLatLng().lng),
+      L.latLng(c.destino[0], c.destino[1])
+    ],
+    routeWhileDragging: true
+  }).addTo(map);
+
+  atualizarLista();
+}
+
+// GERAR CORRIDAS AUTOMÁTICAS A CADA 5 SEGUNDOS
+setInterval(criarCorrida, 5000);
+
+// OPCIONAL: gerar algumas corridas iniciais
+for(let i=0;i<3;i++) criarCorrida();
+</script>
 
 </body>
 </html>

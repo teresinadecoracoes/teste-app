@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>App Entregas - Modo Teste</title>
+<title>App Entregas - Modo Teste Realista</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <!-- LEAFLET CSS -->
@@ -74,7 +74,7 @@ li {
 .status.concluida { color: gray; }
 .status.cancelada { color: var(--vermelho); }
 
-.tempo, .valor, .distancia, .estimativa {
+.tempo, .valor, .distancia, .estimativa, .codigo {
   font-size: 14px;
   color: #555;
 }
@@ -192,6 +192,14 @@ let saldo = 0;
 let corridas = [];
 let disponivel = true;
 
+// PEGAR LOCALIZAÇÃO REAL DO PC
+navigator.geolocation.getCurrentPosition(pos=>{
+  const lat = pos.coords.latitude;
+  const lng = pos.coords.longitude;
+  entregadorMarker.setLatLng([lat,lng]);
+  map.setView([lat,lng], 14);
+});
+
 // BOTAO DISPONIVEL/INDISPONIVEL
 const btnDisponivel = document.getElementById('btnDisponivel');
 btnDisponivel.addEventListener('click', () => {
@@ -213,6 +221,11 @@ function tempoUso(ms) {
   return `${Math.floor(seg/60)}m ${seg%60}s`;
 }
 
+// GERAR CÓDIGO ALEATORIO
+function gerarCodigo(tipo){
+  return tipo + Math.floor(Math.random()*9000 + 1000);
+}
+
 // CRIAR CORRIDA ALEATORIA
 function criarCorrida() {
   if(!disponivel) return;
@@ -230,7 +243,10 @@ function criarCorrida() {
   const distanciaEntrega = (pontoColeta.distanceTo(pontoEntrega)/1000).toFixed(2);
   const estimativa = (distanciaColeta+distanciaEntrega)*3 + 5; // minutos aproximado
 
-  const corrida = {origem, destino, valor, criado, status:'disponivel', distanciaColeta, distanciaEntrega, estimativa: Math.round(estimativa)};
+  const codigoColeta = gerarCodigo('COLETA');
+  const codigoEntrega = gerarCodigo('ENTREGA');
+
+  const corrida = {origem, destino, valor, criado, status:'disponivel', distanciaColeta, distanciaEntrega, estimativa: Math.round(estimativa), codigoColeta, codigoEntrega};
   corridas.unshift(corrida);
   atualizarLista();
 }
@@ -241,10 +257,12 @@ function atualizarLista() {
   lista.innerHTML = '';
   corridas.forEach((c, idx) => {
     let botao = '';
+    let codigoDisplay = '';
     if(c.status==='disponivel' && disponivel) {
       botao = `<button class="acao" onclick="aceitarCorrida(${idx})">Aceitar</button>`;
     } else if(c.status==='aceita') {
       botao = `<button class="acao" onclick="cancelarCorrida(${idx})" style="background-color:#d32f2f">Cancelar</button>`;
+      codigoDisplay = `<div class="codigo"><b>Código Coleta:</b> ${c.codigoColeta}</div>`;
     }
     lista.innerHTML += `
       <li>
@@ -253,6 +271,7 @@ function atualizarLista() {
         <div class="distancia">Km até coleta: ${c.distanciaColeta}</div>
         <div class="distancia">Km de entrega: ${c.distanciaEntrega}</div>
         <div class="estimativa">Tempo estimado: ${c.estimativa} min</div>
+        ${codigoDisplay}
         <div class="tempo">Tempo no app: ${tempoUso(Date.now()-c.criado)}</div>
         ${botao}
       </li>
@@ -263,7 +282,6 @@ function atualizarLista() {
 // ACEITAR CORRIDA
 function aceitarCorrida(idx) {
   if(!disponivel) return alert("Você está indisponível!");
-
   const c = corridas[idx];
   c.status = 'aceita';
   atualizarLista();
@@ -271,11 +289,14 @@ function aceitarCorrida(idx) {
   if(rotaControl) rotaControl.remove();
   rotaControl = L.Routing.control({
     waypoints: [
-      L.latLng(entregadorMarker.getLatLng().lat, entregadorMarker.getLatLng().lng),
+      entregadorMarker.getLatLng(),
       L.latLng(c.destino[0], c.destino[1])
     ],
     routeWhileDragging: true
   }).addTo(map);
+
+  // envia código de entrega no chat
+  adicionarMensagem('Cliente', `Código de entrega: ${c.codigoEntrega}`);
 
   animarEntrega(entregadorMarker.getLatLng(), c.destino, idx, parseFloat(c.valor));
 }

